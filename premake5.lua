@@ -10,7 +10,7 @@ workspace "radar"
 
     cppdialect "C++20"
     characterset "MBCS"
-    symbols "On"           -- Generate debug symbols (.pdb)
+    symbols "Off"
     flags "MultiProcessorCompile"
 
     defines {
@@ -39,8 +39,6 @@ workspace "radar"
     filter "configurations:Release"
         runtime "Release"
         optimize "Speed"
-        symbols "On"            -- Keep debug symbols in Release
-        editandcontinue "Off"   -- Required for optimized builds with symbols
 
 project "radar"
     location "Build"

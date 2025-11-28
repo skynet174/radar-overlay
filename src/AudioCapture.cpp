@@ -199,18 +199,10 @@ void AudioCapture::CaptureThread()
     while (m_Running)
     {
         CalculateDirection();
-        CalculateMultipleSources();
         
-        // Legacy single-source callback
         if (m_Callback && m_Direction.magnitude > m_Threshold)
         {
             m_Callback(m_Direction);
-        }
-        
-        // Multi-source callback
-        if (m_MultiCallback && m_Sources.count > 0)
-        {
-            m_MultiCallback(m_Sources);
         }
         
         Sleep(20);  // ~50 updates per second
@@ -284,134 +276,4 @@ void AudioCapture::CalculateDirection()
     float angle = atan2f(avgX, avgY) * 180.0f / 3.14159f;
     if (angle < 0) angle += 360.0f;
     m_Direction.angle = angle;
-}
-
-void AudioCapture::CalculateMultipleSources()
-{
-    m_Sources.count = 0;
-    
-    float fl = m_Channels.frontLeft * m_Multiplier;
-    float fr = m_Channels.frontRight * m_Multiplier;
-    float rl = m_Channels.rearLeft * m_Multiplier;
-    float rr = m_Channels.rearRight * m_Multiplier;
-    float sl = m_Channels.sideLeft * m_Multiplier;
-    float sr = m_Channels.sideRight * m_Multiplier;
-    float ct = m_Channels.center * m_Multiplier;
-    
-    // Helper to interpolate angle based on two channel volumes
-    // Returns weighted average angle, pulled toward louder channel
-    auto interpolateAngle = [](float angle1, float vol1, float angle2, float vol2) -> float {
-        float total = vol1 + vol2;
-        if (total < 0.001f) return (angle1 + angle2) / 2.0f;
-        
-        // Handle angle wraparound (e.g., 315° and 45°)
-        float diff = angle2 - angle1;
-        if (diff > 180.0f) angle2 -= 360.0f;
-        else if (diff < -180.0f) angle2 += 360.0f;
-        
-        float result = (angle1 * vol1 + angle2 * vol2) / total;
-        if (result < 0.0f) result += 360.0f;
-        if (result >= 360.0f) result -= 360.0f;
-        return result;
-    };
-    
-    // For stereo (2 channels)
-    if (m_Channels.channelCount == 2)
-    {
-        float total = fl + fr;
-        if (total > m_Threshold * 2)
-        {
-            // Single interpolated front source
-            // FL = 315°, FR = 45°, center = 0°
-            float angle = interpolateAngle(315.0f, fl, 45.0f, fr);
-            
-            m_Sources.sources[m_Sources.count].angle = angle;
-            m_Sources.sources[m_Sources.count].magnitude = fminf(1.0f, total * 0.5f);
-            m_Sources.sources[m_Sources.count].active = true;
-            m_Sources.count++;
-        }
-    }
-    else
-    {
-        // Surround: Group adjacent channels and interpolate
-        
-        // === FRONT GROUP (FL + C + FR) ===
-        float frontTotal = fl + ct + fr;
-        if (frontTotal > m_Threshold)
-        {
-            // Weighted interpolation: FL=315°, C=0°, FR=45°
-            float angle = 0.0f;
-            float weightSum = fl + ct + fr;
-            if (weightSum > 0.001f)
-            {
-                // Convert to -45 to +45 range for easier math
-                float flAngle = -45.0f;  // 315° = -45°
-                float cAngle = 0.0f;
-                float frAngle = 45.0f;
-                
-                angle = (flAngle * fl + cAngle * ct + frAngle * fr) / weightSum;
-                if (angle < 0.0f) angle += 360.0f;
-            }
-            
-            m_Sources.sources[m_Sources.count].angle = angle;
-            m_Sources.sources[m_Sources.count].magnitude = fminf(1.0f, frontTotal / 2.0f);
-            m_Sources.sources[m_Sources.count].active = true;
-            m_Sources.count++;
-        }
-        
-        // === REAR GROUP (RL + RR) ===
-        float rearTotal = rl + rr;
-        if (rearTotal > m_Threshold)
-        {
-            // RL=225°, RR=135°, center=180°
-            float angle = interpolateAngle(225.0f, rl, 135.0f, rr);
-            
-            m_Sources.sources[m_Sources.count].angle = angle;
-            m_Sources.sources[m_Sources.count].magnitude = fminf(1.0f, rearTotal / 2.0f);
-            m_Sources.sources[m_Sources.count].active = true;
-            m_Sources.count++;
-        }
-        
-        // === LEFT SIDE GROUP (SL or FL+RL blend) ===
-        float leftSide = sl > 0.01f ? sl : (fl + rl) * 0.3f;
-        if (leftSide > m_Threshold)
-        {
-            // Interpolate between FL(315°), SL(270°), RL(225°)
-            float flWeight = fl * 0.5f;
-            float slWeight = sl;
-            float rlWeight = rl * 0.5f;
-            float total = flWeight + slWeight + rlWeight;
-            
-            if (total > 0.001f)
-            {
-                float angle = (315.0f * flWeight + 270.0f * slWeight + 225.0f * rlWeight) / total;
-                
-                m_Sources.sources[m_Sources.count].angle = angle;
-                m_Sources.sources[m_Sources.count].magnitude = fminf(1.0f, leftSide);
-                m_Sources.sources[m_Sources.count].active = true;
-                m_Sources.count++;
-            }
-        }
-        
-        // === RIGHT SIDE GROUP (SR or FR+RR blend) ===
-        float rightSide = sr > 0.01f ? sr : (fr + rr) * 0.3f;
-        if (rightSide > m_Threshold)
-        {
-            // Interpolate between FR(45°), SR(90°), RR(135°)
-            float frWeight = fr * 0.5f;
-            float srWeight = sr;
-            float rrWeight = rr * 0.5f;
-            float total = frWeight + srWeight + rrWeight;
-            
-            if (total > 0.001f)
-            {
-                float angle = (45.0f * frWeight + 90.0f * srWeight + 135.0f * rrWeight) / total;
-                
-                m_Sources.sources[m_Sources.count].angle = angle;
-                m_Sources.sources[m_Sources.count].magnitude = fminf(1.0f, rightSide);
-                m_Sources.sources[m_Sources.count].active = true;
-                m_Sources.count++;
-            }
-        }
-    }
 }

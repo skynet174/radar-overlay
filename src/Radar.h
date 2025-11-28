@@ -36,12 +36,7 @@ enum class EchoType
 {
     Ping,       // Bright flash when line passes
     Trail,      // Fading trail behind sweep on points
-    Ripple,     // Circular wave from point
-    Line,       // Line from center to sound source
-    Hex,        // Honeycomb grid with highlighted cells
-    Arc,        // Arc/sector in sound direction
-    Cone,       // Cone beam from center
-    Pulse       // Pulsating rings from center toward sound
+    Ripple      // Circular wave from point
 };
 
 enum class RadarPosition
@@ -71,12 +66,6 @@ public:
     void SetShowDegrees(bool show) { m_ShowDegrees = show; }
     bool GetShowDegrees() const { return m_ShowDegrees; }
     
-    void SetShowSweep(bool show) { m_ShowSweep = show; }
-    bool GetShowSweep() const { return m_ShowSweep; }
-    
-    void SetMultiSource(bool multi) { m_MultiSource = multi; }
-    bool GetMultiSource() const { return m_MultiSource; }
-    
     void SetSize(int size);
     int GetSize() const { return m_Size; }
     
@@ -85,8 +74,6 @@ public:
     
     void AddRandomSignature();
     void AddSignature(float angle, float distance, float intensity);
-    void UpdateAudioPoint(float angle, float distance, float intensity);
-    void UpdateAudioSources(int count, const float* angles, const float* distances, const float* intensities);
     void ClearSignatures();
     
     void SetEchoType(EchoType type) { m_EchoType = type; }
@@ -120,8 +107,6 @@ private:
     bool m_Visible = false;
     bool m_Running = true;
     bool m_ShowDegrees = true;
-    bool m_ShowSweep = true;
-    bool m_MultiSource = true;  // true = multiple sources, false = single interpolated
     float m_Opacity = 1.0f;
 
     // D3D11
@@ -158,32 +143,4 @@ private:
     // Render thread
     std::thread m_RenderThread;
     std::atomic<bool> m_RenderThreadRunning{false};
-    
-    // Audio point with trail history
-    struct AudioTrailPoint {
-        float angle = 0.0f;
-        float distance = 0.0f;
-        float intensity = 0.0f;
-        float time = -1.0f;  // Negative = not yet used
-    };
-    static const int TRAIL_HISTORY_SIZE = 20;
-    AudioTrailPoint m_AudioTrail[TRAIL_HISTORY_SIZE] = {};
-    int m_AudioTrailIndex = 0;
-    bool m_HasAudioPoint = false;
-    float m_AudioPointAngle = 0.0f;
-    float m_AudioPointDistance = 0.5f;
-    float m_AudioPointIntensity = 0.0f;
-    
-    // Multiple audio sources
-    static const int MAX_AUDIO_SOURCES = 8;
-    struct AudioSource {
-        float angle = 0.0f;
-        float distance = 0.0f;
-        float intensity = 0.0f;
-        bool active = false;
-        AudioTrailPoint trail[TRAIL_HISTORY_SIZE] = {};
-        int trailIndex = 0;
-    };
-    AudioSource m_AudioSources[MAX_AUDIO_SOURCES] = {};
-    int m_AudioSourceCount = 0;
 };

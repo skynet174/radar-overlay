@@ -16,8 +16,7 @@ struct Vertex
 struct alignas(16) ConstantBuffer
 {
     float time;
-    float showSweep;
-    float padding[2];
+    float padding[3];
 };
 
 // Shader source with antialiasing
@@ -25,8 +24,7 @@ const char* g_RadarShader = R"(
 cbuffer Constants : register(b0)
 {
     float time;
-    float showSweep;
-    float2 padding;
+    float3 padding;
 };
 
 struct VS_INPUT
@@ -84,39 +82,34 @@ float4 PSMain(PS_INPUT input) : SV_TARGET
     if (normAngle < 0.0f) normAngle += 6.28318f;
     if (normAngle > 6.28318f) normAngle -= 6.28318f;
     
-    float sweep = 0.0f;
-    float sweepLine = 0.0f;
+    float sweepSpeed = 1.5f;
+    float sweepAngle = 6.28318f - fmod(time * sweepSpeed, 6.28318f);  // Clockwise rotation
     
-    if (showSweep > 0.5f)
+    float angleDiff = normAngle - sweepAngle;
+    if (angleDiff < 0.0f) angleDiff += 6.28318f;
+    
+    // Calculate opposite angle difference (180 degrees apart)
+    float angleDiff2 = angleDiff + 3.14159f;
+    if (angleDiff2 > 6.28318f) angleDiff2 -= 6.28318f;
+    
+    // Smooth sweep trail for both lines
+    float trailLength = 2.0f;
+    float sweep = 0.0f;
+    if (angleDiff < trailLength)
     {
-        float sweepSpeed = 1.5f;
-        float sweepAngle = 6.28318f - fmod(time * sweepSpeed, 6.28318f);  // Clockwise rotation
-        
-        float angleDiff = normAngle - sweepAngle;
-        if (angleDiff < 0.0f) angleDiff += 6.28318f;
-        
-        // Calculate opposite angle difference (180 degrees apart)
-        float angleDiff2 = angleDiff + 3.14159f;
-        if (angleDiff2 > 6.28318f) angleDiff2 -= 6.28318f;
-        
-        // Smooth sweep trail for both lines
-        float trailLength = 2.0f;
-        if (angleDiff < trailLength)
-        {
-            sweep = 1.0f - (angleDiff / trailLength);
-            sweep = pow(sweep, 2.0f);
-        }
-        if (angleDiff2 < trailLength)
-        {
-            float sweep2 = 1.0f - (angleDiff2 / trailLength);
-            sweep = max(sweep, pow(sweep2, 2.0f));
-        }
-        
-        // Antialiased sweep lines (two opposite lines)
-        float sweepLine1 = smoothstep(0.08f, 0.0f, angleDiff) + smoothstep(6.20f, 6.28318f, angleDiff);
-        float sweepLine2 = smoothstep(0.08f, 0.0f, angleDiff2) + smoothstep(6.20f, 6.28318f, angleDiff2);
-        sweepLine = saturate(sweepLine1 + sweepLine2);
+        sweep = 1.0f - (angleDiff / trailLength);
+        sweep = pow(sweep, 2.0f);
     }
+    if (angleDiff2 < trailLength)
+    {
+        float sweep2 = 1.0f - (angleDiff2 / trailLength);
+        sweep = max(sweep, pow(sweep2, 2.0f));
+    }
+    
+    // Antialiased sweep lines (two opposite lines)
+    float sweepLine1 = smoothstep(0.08f, 0.0f, angleDiff) + smoothstep(6.20f, 6.28318f, angleDiff);
+    float sweepLine2 = smoothstep(0.08f, 0.0f, angleDiff2) + smoothstep(6.20f, 6.28318f, angleDiff2);
+    float sweepLine = saturate(sweepLine1 + sweepLine2);
     
     // Antialiased concentric rings
     float rings = 0.0f;
@@ -478,75 +471,9 @@ void Radar::AddSignature(float angle, float distance, float intensity)
     m_Signatures.push_back(sig);
 }
 
-void Radar::UpdateAudioPoint(float angle, float distance, float intensity)
-{
-    // Update current audio point position
-    m_AudioPointAngle = angle;
-    m_AudioPointDistance = fminf(0.95f, fmaxf(0.1f, distance));
-    m_AudioPointIntensity = intensity;
-    m_HasAudioPoint = intensity > 0.05f;
-    
-    // Add to trail history
-    if (m_HasAudioPoint)
-    {
-        m_AudioTrail[m_AudioTrailIndex].angle = angle;
-        m_AudioTrail[m_AudioTrailIndex].distance = distance;
-        m_AudioTrail[m_AudioTrailIndex].intensity = intensity;
-        m_AudioTrail[m_AudioTrailIndex].time = m_Time;
-        m_AudioTrailIndex = (m_AudioTrailIndex + 1) % TRAIL_HISTORY_SIZE;
-    }
-}
-
-void Radar::UpdateAudioSources(int count, const float* angles, const float* distances, const float* intensities)
-{
-    m_AudioSourceCount = count > MAX_AUDIO_SOURCES ? MAX_AUDIO_SOURCES : count;
-    m_HasAudioPoint = m_AudioSourceCount > 0;
-    
-    for (int i = 0; i < m_AudioSourceCount; i++)
-    {
-        m_AudioSources[i].angle = angles[i];
-        m_AudioSources[i].distance = fminf(0.95f, fmaxf(0.1f, distances[i]));
-        m_AudioSources[i].intensity = intensities[i];
-        m_AudioSources[i].active = intensities[i] > 0.05f;
-        
-        // Add to this source's trail
-        if (m_AudioSources[i].active)
-        {
-            int& idx = m_AudioSources[i].trailIndex;
-            m_AudioSources[i].trail[idx].angle = angles[i];
-            m_AudioSources[i].trail[idx].distance = distances[i];
-            m_AudioSources[i].trail[idx].intensity = intensities[i];
-            m_AudioSources[i].trail[idx].time = m_Time;
-            idx = (idx + 1) % TRAIL_HISTORY_SIZE;
-        }
-    }
-    
-    // Also update legacy single point (use strongest source)
-    if (m_AudioSourceCount > 0)
-    {
-        int strongest = 0;
-        for (int i = 1; i < m_AudioSourceCount; i++)
-        {
-            if (intensities[i] > intensities[strongest])
-                strongest = i;
-        }
-        m_AudioPointAngle = angles[strongest];
-        m_AudioPointDistance = distances[strongest];
-        m_AudioPointIntensity = intensities[strongest];
-        
-        // Update main trail
-        m_AudioTrail[m_AudioTrailIndex].angle = angles[strongest];
-        m_AudioTrail[m_AudioTrailIndex].distance = distances[strongest];
-        m_AudioTrail[m_AudioTrailIndex].intensity = intensities[strongest];
-        m_AudioTrail[m_AudioTrailIndex].time = m_Time;
-        m_AudioTrailIndex = (m_AudioTrailIndex + 1) % TRAIL_HISTORY_SIZE;
-    }
-}
-
 void Radar::RenderSignatures()
 {
-    if (!m_D2DRenderTarget || !m_SignatureBrush) return;
-    if (m_Signatures.empty() && !m_HasAudioPoint) return;
+    if (!m_D2DRenderTarget || !m_SignatureBrush || m_Signatures.empty()) return;
     
     float center = m_Size / 2.0f;
     float maxRadius = m_Size / 2.0f - 10.0f;
@@ -717,360 +644,6 @@ void Radar::RenderSignatures()
         D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(pd.x, pd.y), pd.pointSize, pd.pointSize);
         m_SignatureBrush->SetColor(D2D1::ColorF(1.0f, 0.5f, 0.5f, pd.alpha));
         m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-    }
-    
-    // ===== Render Audio Sources =====
-    // Color palette for different sources
-    static const D2D1_COLOR_F sourceColors[] = {
-        { 0.3f, 1.0f, 0.5f, 1.0f },  // Green
-        { 1.0f, 0.4f, 0.4f, 1.0f },  // Red
-        { 0.4f, 0.7f, 1.0f, 1.0f },  // Blue
-        { 1.0f, 0.8f, 0.2f, 1.0f },  // Yellow
-        { 1.0f, 0.4f, 1.0f, 1.0f },  // Magenta
-        { 0.3f, 1.0f, 1.0f, 1.0f },  // Cyan
-        { 1.0f, 0.6f, 0.3f, 1.0f },  // Orange
-        { 0.7f, 0.5f, 1.0f, 1.0f },  // Purple
-    };
-    
-    // ===== SINGLE SOURCE MODE (old behavior for Ping/Trail/Ripple) =====
-    if (m_HasAudioPoint && !m_MultiSource)
-    {
-        float radAngle = (m_AudioPointAngle - 90.0f) * 3.14159f / 180.0f;
-        float x = center + cosf(radAngle) * (m_AudioPointDistance * maxRadius);
-        float y = center + sinf(radAngle) * (m_AudioPointDistance * maxRadius);
-        float pointSize = (5.0f + m_AudioPointIntensity * 5.0f) * scale;
-        
-        switch (m_EchoType)
-        {
-        case EchoType::Ping:
-            {
-                // Simple point with glow
-                m_SignatureBrush->SetColor(D2D1::ColorF(0.3f, 1.0f, 0.5f, m_AudioPointIntensity * 0.4f));
-                D2D1_ELLIPSE glow = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize * 2.5f, pointSize * 2.5f);
-                m_D2DRenderTarget->FillEllipse(glow, m_SignatureBrush);
-                
-                m_SignatureBrush->SetColor(D2D1::ColorF(0.5f, 1.0f, 0.7f, m_AudioPointIntensity));
-                D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-            }
-            break;
-            
-        case EchoType::Trail:
-            {
-                // Draw trail history
-                for (int i = 0; i < TRAIL_HISTORY_SIZE; i++)
-                {
-                    int idx = (m_AudioTrailIndex - 1 - i + TRAIL_HISTORY_SIZE) % TRAIL_HISTORY_SIZE;
-                    float age = m_Time - m_AudioTrail[idx].time;
-                    if (age > 1.5f || m_AudioTrail[idx].intensity < 0.01f) continue;
-                    
-                    float trailAlpha = (1.0f - age / 1.5f) * m_AudioTrail[idx].intensity * 0.6f;
-                    float trailSize = (3.0f + m_AudioTrail[idx].intensity * 3.0f) * scale * (1.0f - i * 0.03f);
-                    float trailRad = (m_AudioTrail[idx].angle - 90.0f) * 3.14159f / 180.0f;
-                    float tx = center + cosf(trailRad) * (m_AudioTrail[idx].distance * maxRadius);
-                    float ty = center + sinf(trailRad) * (m_AudioTrail[idx].distance * maxRadius);
-                    
-                    m_SignatureBrush->SetColor(D2D1::ColorF(0.2f, 1.0f, 0.3f, trailAlpha));
-                    D2D1_ELLIPSE trail = D2D1::Ellipse(D2D1::Point2F(tx, ty), trailSize, trailSize);
-                    m_D2DRenderTarget->FillEllipse(trail, m_SignatureBrush);
-                }
-                // Current point
-                m_SignatureBrush->SetColor(D2D1::ColorF(0.5f, 1.0f, 0.7f, m_AudioPointIntensity));
-                D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-            }
-            break;
-            
-        case EchoType::Ripple:
-            {
-                // Ripple rings
-                float rippleTime = fmodf(m_Time * 2.0f, 1.0f);
-                for (int r = 0; r < 3; r++)
-                {
-                    float rPhase = fmodf(rippleTime + r * 0.33f, 1.0f);
-                    float rRadius = pointSize + rPhase * 30.0f * scale;
-                    float rAlpha = (1.0f - rPhase) * m_AudioPointIntensity * 0.6f;
-                    
-                    m_SignatureBrush->SetColor(D2D1::ColorF(0.3f, 0.8f, 1.0f, rAlpha));
-                    D2D1_ELLIPSE ripple = D2D1::Ellipse(D2D1::Point2F(x, y), rRadius, rRadius);
-                    m_D2DRenderTarget->DrawEllipse(ripple, m_SignatureBrush, 2.0f * scale);
-                }
-                
-                // Center point
-                m_SignatureBrush->SetColor(D2D1::ColorF(0.5f, 1.0f, 0.7f, m_AudioPointIntensity));
-                D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-            }
-            break;
-            
-        default:
-            // For other modes, fall through to multi-source
-            break;
-        }
-        
-        // If handled by single source mode, skip multi-source
-        if (m_EchoType == EchoType::Ping || m_EchoType == EchoType::Trail || m_EchoType == EchoType::Ripple)
-            return;
-    }
-    
-    // ===== MULTI SOURCE MODE =====
-    if (m_HasAudioPoint && m_AudioSourceCount > 0)
-    {
-        // Render each audio source
-        for (int src = 0; src < m_AudioSourceCount; src++)
-        {
-            if (!m_AudioSources[src].active) continue;
-            
-            float srcAngle = m_AudioSources[src].angle;
-            float srcDist = m_AudioSources[src].distance;
-            float srcIntensity = m_AudioSources[src].intensity;
-            
-            float radAngle = (srcAngle - 90.0f) * 3.14159f / 180.0f;
-            float x = center + cosf(radAngle) * (srcDist * maxRadius);
-            float y = center + sinf(radAngle) * (srcDist * maxRadius);
-            float pointSize = (4.0f + srcIntensity * 4.0f) * scale;
-            
-            D2D1_COLOR_F baseColor = sourceColors[src % 8];
-            
-            switch (m_EchoType)
-            {
-            case EchoType::Trail:
-                {
-                    // Draw trail for this source
-                    for (int i = 0; i < TRAIL_HISTORY_SIZE; i++)
-                    {
-                        int idx = (m_AudioSources[src].trailIndex - 1 - i + TRAIL_HISTORY_SIZE) % TRAIL_HISTORY_SIZE;
-                        float age = m_Time - m_AudioSources[src].trail[idx].time;
-                        if (age > 1.5f || m_AudioSources[src].trail[idx].intensity < 0.01f) continue;
-                        
-                        float trailAlpha = (1.0f - age / 1.5f) * m_AudioSources[src].trail[idx].intensity * 0.5f;
-                        float trailSize = (3.0f + m_AudioSources[src].trail[idx].intensity * 3.0f) * scale * (1.0f - i * 0.03f);
-                        float trailRad = (m_AudioSources[src].trail[idx].angle - 90.0f) * 3.14159f / 180.0f;
-                        float tx = center + cosf(trailRad) * (m_AudioSources[src].trail[idx].distance * maxRadius);
-                        float ty = center + sinf(trailRad) * (m_AudioSources[src].trail[idx].distance * maxRadius);
-                        
-                        m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r * 0.7f, baseColor.g * 0.7f, baseColor.b * 0.7f, trailAlpha));
-                        D2D1_ELLIPSE trail = D2D1::Ellipse(D2D1::Point2F(tx, ty), trailSize, trailSize);
-                        m_D2DRenderTarget->FillEllipse(trail, m_SignatureBrush);
-                    }
-                    // Current point
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity));
-                    D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                    m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-                }
-                break;
-                
-            case EchoType::Line:
-                {
-                    // Line from center to point
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity * 0.8f));
-                    m_D2DRenderTarget->DrawLine(
-                        D2D1::Point2F(center, center),
-                        D2D1::Point2F(x, y),
-                        m_SignatureBrush, 3.0f * scale);
-                    
-                    // Glow line
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity * 0.3f));
-                    m_D2DRenderTarget->DrawLine(
-                        D2D1::Point2F(center, center),
-                        D2D1::Point2F(x, y),
-                        m_SignatureBrush, 8.0f * scale);
-                    
-                    // End point
-                    m_SignatureBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, srcIntensity));
-                    D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                    m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-                }
-                break;
-                
-            case EchoType::Arc:
-                {
-                    // Arc/sector in sound direction
-                    float arcWidth = 35.0f; // degrees
-                    float startAng = (srcAngle - arcWidth / 2.0f - 90.0f) * 3.14159f / 180.0f;
-                    float endAng = (srcAngle + arcWidth / 2.0f - 90.0f) * 3.14159f / 180.0f;
-                    
-                    // Draw arc rings
-                    for (int r = 1; r <= 4; r++)
-                    {
-                        float ringDist = (r / 4.0f) * srcDist * maxRadius;
-                        float alpha = srcIntensity * (0.3f + 0.2f * (4 - r) / 4.0f);
-                        
-                        m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, alpha));
-                        
-                        int segments = 15;
-                        for (int s = 0; s < segments; s++)
-                        {
-                            float a1 = startAng + (endAng - startAng) * s / segments;
-                            float a2 = startAng + (endAng - startAng) * (s + 1) / segments;
-                            m_D2DRenderTarget->DrawLine(
-                                D2D1::Point2F(center + cosf(a1) * ringDist, center + sinf(a1) * ringDist),
-                                D2D1::Point2F(center + cosf(a2) * ringDist, center + sinf(a2) * ringDist),
-                                m_SignatureBrush, 2.5f * scale);
-                        }
-                    }
-                    
-                    // Point at source
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity));
-                    D2D1_ELLIPSE pt = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                    m_D2DRenderTarget->FillEllipse(pt, m_SignatureBrush);
-                }
-                break;
-                
-            case EchoType::Cone:
-                {
-                    // Cone beam from center
-                    float coneWidth = 20.0f; // degrees
-                    float leftAng = (srcAngle - coneWidth - 90.0f) * 3.14159f / 180.0f;
-                    float rightAng = (srcAngle + coneWidth - 90.0f) * 3.14159f / 180.0f;
-                    float reach = srcDist * maxRadius * 1.1f;
-                    
-                    // Fill cone layers
-                    for (int layer = 8; layer >= 1; layer--)
-                    {
-                        float layerDist = reach * layer / 8.0f;
-                        float alpha = srcIntensity * 0.1f * (9 - layer) / 8.0f;
-                        m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, alpha));
-                        
-                        m_D2DRenderTarget->DrawLine(
-                            D2D1::Point2F(center, center),
-                            D2D1::Point2F(center + cosf(leftAng) * layerDist, center + sinf(leftAng) * layerDist),
-                            m_SignatureBrush, 2.0f * scale);
-                        m_D2DRenderTarget->DrawLine(
-                            D2D1::Point2F(center, center),
-                            D2D1::Point2F(center + cosf(rightAng) * layerDist, center + sinf(rightAng) * layerDist),
-                            m_SignatureBrush, 2.0f * scale);
-                    }
-                    
-                    // Bright edges
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity * 0.7f));
-                    m_D2DRenderTarget->DrawLine(
-                        D2D1::Point2F(center, center),
-                        D2D1::Point2F(center + cosf(leftAng) * reach, center + sinf(leftAng) * reach),
-                        m_SignatureBrush, 2.0f * scale);
-                    m_D2DRenderTarget->DrawLine(
-                        D2D1::Point2F(center, center),
-                        D2D1::Point2F(center + cosf(rightAng) * reach, center + sinf(rightAng) * reach),
-                        m_SignatureBrush, 2.0f * scale);
-                    
-                    // Target point
-                    m_SignatureBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, srcIntensity));
-                    D2D1_ELLIPSE target = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                    m_D2DRenderTarget->FillEllipse(target, m_SignatureBrush);
-                }
-                break;
-            
-            case EchoType::Pulse:
-                {
-                    // Pulsating rings toward this source
-                    float pulsePhase = fmodf(m_Time * 3.0f + src * 0.3f, 1.0f);
-                    
-                    for (int ring = 0; ring < 3; ring++)
-                    {
-                        float ringPhase = fmodf(pulsePhase + ring * 0.33f, 1.0f);
-                        float ringRadius = ringPhase * srcDist * maxRadius;
-                        float ringAlpha = (1.0f - ringPhase) * srcIntensity * 0.5f;
-                        
-                        m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, ringAlpha));
-                        D2D1_ELLIPSE pulse = D2D1::Ellipse(D2D1::Point2F(center, center), ringRadius, ringRadius);
-                        m_D2DRenderTarget->DrawEllipse(pulse, m_SignatureBrush, 2.5f * scale);
-                    }
-                    
-                    // Direction indicator
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity * 0.5f));
-                    m_D2DRenderTarget->DrawLine(
-                        D2D1::Point2F(center, center),
-                        D2D1::Point2F(x, y),
-                        m_SignatureBrush, 2.0f * scale);
-                    
-                    // Target point
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity));
-                    D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize * 1.3f, pointSize * 1.3f);
-                    m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-                }
-                break;
-                
-            case EchoType::Hex:
-                // Hex is special - render once for all sources, not per-source
-                break;
-                
-            default: // Ping, Ripple, and others
-                {
-                    // Simple point with glow
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity * 0.4f));
-                    D2D1_ELLIPSE glow = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize * 2.5f, pointSize * 2.5f);
-                    m_D2DRenderTarget->FillEllipse(glow, m_SignatureBrush);
-                    
-                    m_SignatureBrush->SetColor(D2D1::ColorF(baseColor.r, baseColor.g, baseColor.b, srcIntensity));
-                    D2D1_ELLIPSE point = D2D1::Ellipse(D2D1::Point2F(x, y), pointSize, pointSize);
-                    m_D2DRenderTarget->FillEllipse(point, m_SignatureBrush);
-                }
-                break;
-            }
-        }
-        
-        // Hex mode - render grid once with all sources highlighted
-        if (m_EchoType == EchoType::Hex)
-        {
-            int rings = 4;
-            float hexSize = maxRadius / (rings * 1.8f);
-            
-            for (int ring = 1; ring <= rings; ring++)
-            {
-                int cellsInRing = ring * 6;
-                for (int cell = 0; cell < cellsInRing; cell++)
-                {
-                    float cellAngle = (360.0f / cellsInRing) * cell;
-                    float cellRad = (cellAngle - 90.0f) * 3.14159f / 180.0f;
-                    float cellDist = ring * hexSize * 1.5f;
-                    float hx = center + cosf(cellRad) * cellDist;
-                    float hy = center + sinf(cellRad) * cellDist;
-                    
-                    // Check all sources for this hex
-                    float maxHighlight = 0.0f;
-                    int highlightSource = -1;
-                    
-                    for (int src = 0; src < m_AudioSourceCount; src++)
-                    {
-                        if (!m_AudioSources[src].active) continue;
-                        
-                        float angleDiff = fabsf(cellAngle - m_AudioSources[src].angle);
-                        if (angleDiff > 180.0f) angleDiff = 360.0f - angleDiff;
-                        float distDiff = fabsf((float)ring / rings - m_AudioSources[src].distance);
-                        
-                        if (angleDiff < 35.0f && distDiff < 0.35f)
-                        {
-                            float h = (1.0f - angleDiff / 35.0f) * (1.0f - distDiff / 0.35f) * m_AudioSources[src].intensity;
-                            if (h > maxHighlight)
-                            {
-                                maxHighlight = h;
-                                highlightSource = src;
-                            }
-                        }
-                    }
-                    
-                    // Draw hex
-                    float alpha = 0.12f + maxHighlight * 0.8f;
-                    D2D1_COLOR_F hexColor = { 0.1f, 0.5f, 0.3f, alpha };
-                    
-                    if (highlightSource >= 0)
-                    {
-                        D2D1_COLOR_F srcColor = sourceColors[highlightSource % 8];
-                        hexColor.r = srcColor.r * maxHighlight + 0.1f * (1.0f - maxHighlight);
-                        hexColor.g = srcColor.g * maxHighlight + 0.5f * (1.0f - maxHighlight);
-                        hexColor.b = srcColor.b * maxHighlight + 0.3f * (1.0f - maxHighlight);
-                    }
-                    
-                    m_SignatureBrush->SetColor(hexColor);
-                    D2D1_ELLIPSE hex = D2D1::Ellipse(D2D1::Point2F(hx, hy), hexSize * 0.75f, hexSize * 0.75f);
-                    
-                    if (maxHighlight > 0.3f)
-                        m_D2DRenderTarget->FillEllipse(hex, m_SignatureBrush);
-                    else
-                        m_D2DRenderTarget->DrawEllipse(hex, m_SignatureBrush, 1.0f * scale);
-                }
-            }
-        }
     }
 }
 
@@ -1289,7 +862,6 @@ void Radar::Render()
     m_Context->Map(m_ConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
     ConstantBuffer* cb = (ConstantBuffer*)mapped.pData;
     cb->time = m_Time;
-    cb->showSweep = m_ShowSweep ? 1.0f : 0.0f;
     m_Context->Unmap(m_ConstantBuffer, 0);
 
     float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};

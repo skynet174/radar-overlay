@@ -1,5 +1,4 @@
 #include "Interface.h"
-#include "Settings.h"
 #include <dwmapi.h>
 #include <mmdeviceapi.h>
 #include <functiondiscoverykeys_devpkey.h>
@@ -184,51 +183,36 @@ bool Interface::CreateMenuWindow(HINSTANCE hInstance)
     
     // ===== Control Buttons =====
     int btnY = 285;
-    int smallBtnWidth = 95;
-    int totalWidth = smallBtnWidth * 3 + spacing * 2;
+    int totalWidth = btnWidth * 2 + spacing;
     int btnStartX = (clientWidth - totalWidth) / 2;
     
     m_BtnToggle = CreateWindowW(L"BUTTON", L"Hide Radar",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        btnStartX, btnY, smallBtnWidth, btnHeight,
+        btnStartX, btnY, btnWidth, btnHeight,
         m_Hwnd, (HMENU)BTN_TOGGLE, hInstance, nullptr);
     
-    m_BtnDegrees = CreateWindowW(L"BUTTON", L"[Degrees]",
+    m_BtnDegrees = CreateWindowW(L"BUTTON", L"Degrees\u00B0",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        btnStartX + smallBtnWidth + spacing, btnY, smallBtnWidth, btnHeight,
+        btnStartX + btnWidth + spacing, btnY, btnWidth, btnHeight,
         m_Hwnd, (HMENU)BTN_DEGREES, hInstance, nullptr);
     
-    m_BtnSweep = CreateWindowW(L"BUTTON", L"[Sweep]",
+    // Random signature button
+    m_BtnRandomSig = CreateWindowW(L"BUTTON", L"Random Signature",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        btnStartX + (smallBtnWidth + spacing) * 2, btnY, smallBtnWidth, btnHeight,
-        m_Hwnd, (HMENU)BTN_SWEEP, hInstance, nullptr);
-    
-    // Random signature and Multi Source buttons
-    int row2Width = 140;
-    int row2StartX = margin + 10;
-    
-    m_BtnRandomSig = CreateWindowW(L"BUTTON", L"Random Sig",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        row2StartX, btnY + btnHeight + spacing, row2Width, btnHeight,
+        (clientWidth - 150) / 2, btnY + btnHeight + spacing, 150, btnHeight,
         m_Hwnd, (HMENU)BTN_RANDOM_SIG, hInstance, nullptr);
-    
-    m_BtnMultiSource = CreateWindowW(L"BUTTON", L"[Multi]",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        row2StartX + row2Width + spacing, btnY + btnHeight + spacing, row2Width, btnHeight,
-        m_Hwnd, (HMENU)BTN_MULTI_SOURCE, hInstance, nullptr);
     
     // ===== Echo Type Group =====
     int echoY = btnY + btnHeight * 2 + spacing * 2;
-    m_GroupEcho = CreateWindowW(L"BUTTON", L"Display Mode",
+    m_GroupEcho = CreateWindowW(L"BUTTON", L"Echo Type",
         WS_VISIBLE | WS_CHILD | BS_GROUPBOX,
-        margin, echoY, groupWidth, 105,
+        margin, echoY, groupWidth, 50,
         m_Hwnd, nullptr, hInstance, nullptr);
     
-    int echoBtnWidth = 70;
-    int echoStartX = margin + 10;
+    int echoBtnWidth = 85;
+    int echoStartX = margin + (groupWidth - echoBtnWidth * 3 - spacing * 2) / 2;
     int echoBtnY = echoY + 20;
     
-    // Row 1: Ping, Trail, Ripple, Line
     m_BtnEchoPing = CreateWindowW(L"BUTTON", L"[Ping]",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
         echoStartX, echoBtnY, echoBtnWidth, 25,
@@ -236,44 +220,16 @@ bool Interface::CreateMenuWindow(HINSTANCE hInstance)
     
     m_BtnEchoTrail = CreateWindowW(L"BUTTON", L"Trail",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + echoBtnWidth + 5, echoBtnY, echoBtnWidth, 25,
+        echoStartX + echoBtnWidth + spacing, echoBtnY, echoBtnWidth, 25,
         m_Hwnd, (HMENU)BTN_ECHO_TRAIL, hInstance, nullptr);
     
     m_BtnEchoRipple = CreateWindowW(L"BUTTON", L"Ripple",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + (echoBtnWidth + 5) * 2, echoBtnY, echoBtnWidth, 25,
+        echoStartX + (echoBtnWidth + spacing) * 2, echoBtnY, echoBtnWidth, 25,
         m_Hwnd, (HMENU)BTN_ECHO_RIPPLE, hInstance, nullptr);
     
-    m_BtnEchoLine = CreateWindowW(L"BUTTON", L"Line",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + (echoBtnWidth + 5) * 3, echoBtnY, echoBtnWidth, 25,
-        m_Hwnd, (HMENU)BTN_ECHO_LINE, hInstance, nullptr);
-    
-    // Row 2: Hex, Arc, Cone, Pulse
-    int echoBtnY2 = echoBtnY + 30;
-    
-    m_BtnEchoHex = CreateWindowW(L"BUTTON", L"Hex",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX, echoBtnY2, echoBtnWidth, 25,
-        m_Hwnd, (HMENU)BTN_ECHO_HEX, hInstance, nullptr);
-    
-    m_BtnEchoArc = CreateWindowW(L"BUTTON", L"Arc",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + echoBtnWidth + 5, echoBtnY2, echoBtnWidth, 25,
-        m_Hwnd, (HMENU)BTN_ECHO_ARC, hInstance, nullptr);
-    
-    m_BtnEchoCone = CreateWindowW(L"BUTTON", L"Cone",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + (echoBtnWidth + 5) * 2, echoBtnY2, echoBtnWidth, 25,
-        m_Hwnd, (HMENU)BTN_ECHO_CONE, hInstance, nullptr);
-    
-    m_BtnEchoPulse = CreateWindowW(L"BUTTON", L"Pulse",
-        WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-        echoStartX + (echoBtnWidth + 5) * 3, echoBtnY2, echoBtnWidth, 25,
-        m_Hwnd, (HMENU)BTN_ECHO_PULSE, hInstance, nullptr);
-    
     // Audio capture button
-    int audioBtnY = echoY + 115;
+    int audioBtnY = echoY + 60;
     m_BtnAudioCapture = CreateWindowW(L"BUTTON", L"Start Audio Capture",
         WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
         (clientWidth - 180) / 2, audioBtnY, 180, 30,
@@ -428,18 +384,8 @@ void Interface::OnButtonClick(int buttonId)
         break;
     case BTN_DEGREES:
         m_DegreesVisible = !m_DegreesVisible;
-        SetWindowTextW(m_BtnDegrees, m_DegreesVisible ? L"[Degrees]" : L"Degrees");
+        SetWindowTextW(m_BtnDegrees, m_DegreesVisible ? L"Degrees\u00B0" : L"Degrees");
         if (m_DegreesCallback) m_DegreesCallback(m_DegreesVisible);
-        break;
-    case BTN_SWEEP:
-        m_SweepVisible = !m_SweepVisible;
-        SetWindowTextW(m_BtnSweep, m_SweepVisible ? L"[Sweep]" : L"Sweep");
-        if (m_SweepCallback) m_SweepCallback(m_SweepVisible);
-        break;
-    case BTN_MULTI_SOURCE:
-        m_MultiSourceEnabled = !m_MultiSourceEnabled;
-        SetWindowTextW(m_BtnMultiSource, m_MultiSourceEnabled ? L"[Multi]" : L"[Single]");
-        if (m_MultiSourceCallback) m_MultiSourceCallback(m_MultiSourceEnabled);
         break;
     case BTN_SIZE_RESET:
         m_RadarSize = DEFAULT_RADAR_SIZE;
@@ -451,39 +397,22 @@ void Interface::OnButtonClick(int buttonId)
         if (m_SignatureCallback) m_SignatureCallback();
         break;
     case BTN_ECHO_PING:
+        SetWindowTextW(m_BtnEchoPing, L"[Ping]");
+        SetWindowTextW(m_BtnEchoTrail, L"Trail");
+        SetWindowTextW(m_BtnEchoRipple, L"Ripple");
+        if (m_EchoCallback) m_EchoCallback(0);
+        break;
     case BTN_ECHO_TRAIL:
+        SetWindowTextW(m_BtnEchoPing, L"Ping");
+        SetWindowTextW(m_BtnEchoTrail, L"[Trail]");
+        SetWindowTextW(m_BtnEchoRipple, L"Ripple");
+        if (m_EchoCallback) m_EchoCallback(1);
+        break;
     case BTN_ECHO_RIPPLE:
-    case BTN_ECHO_LINE:
-    case BTN_ECHO_HEX:
-    case BTN_ECHO_ARC:
-    case BTN_ECHO_CONE:
-    case BTN_ECHO_PULSE:
-        {
-            // Reset all buttons
-            SetWindowTextW(m_BtnEchoPing, L"Ping");
-            SetWindowTextW(m_BtnEchoTrail, L"Trail");
-            SetWindowTextW(m_BtnEchoRipple, L"Ripple");
-            SetWindowTextW(m_BtnEchoLine, L"Line");
-            SetWindowTextW(m_BtnEchoHex, L"Hex");
-            SetWindowTextW(m_BtnEchoArc, L"Arc");
-            SetWindowTextW(m_BtnEchoCone, L"Cone");
-            SetWindowTextW(m_BtnEchoPulse, L"Pulse");
-            
-            // Set selected
-            int echoType = 0;
-            switch (buttonId)
-            {
-            case BTN_ECHO_PING:   SetWindowTextW(m_BtnEchoPing, L"[Ping]");     echoType = 0; break;
-            case BTN_ECHO_TRAIL:  SetWindowTextW(m_BtnEchoTrail, L"[Trail]");   echoType = 1; break;
-            case BTN_ECHO_RIPPLE: SetWindowTextW(m_BtnEchoRipple, L"[Ripple]"); echoType = 2; break;
-            case BTN_ECHO_LINE:   SetWindowTextW(m_BtnEchoLine, L"[Line]");     echoType = 3; break;
-            case BTN_ECHO_HEX:    SetWindowTextW(m_BtnEchoHex, L"[Hex]");       echoType = 4; break;
-            case BTN_ECHO_ARC:    SetWindowTextW(m_BtnEchoArc, L"[Arc]");       echoType = 5; break;
-            case BTN_ECHO_CONE:   SetWindowTextW(m_BtnEchoCone, L"[Cone]");     echoType = 6; break;
-            case BTN_ECHO_PULSE:  SetWindowTextW(m_BtnEchoPulse, L"[Pulse]");   echoType = 7; break;
-            }
-            if (m_EchoCallback) m_EchoCallback(echoType);
-        }
+        SetWindowTextW(m_BtnEchoPing, L"Ping");
+        SetWindowTextW(m_BtnEchoTrail, L"Trail");
+        SetWindowTextW(m_BtnEchoRipple, L"[Ripple]");
+        if (m_EchoCallback) m_EchoCallback(2);
         break;
     case BTN_AUDIO_CAPTURE:
         m_AudioCaptureEnabled = !m_AudioCaptureEnabled;
@@ -549,65 +478,4 @@ LRESULT CALLBACK Interface::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
     }
     
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
-}
-
-void Interface::ApplySettings(const AppSettings& settings)
-{
-    // Apply size
-    m_RadarSize = settings.size;
-    if (m_SliderSize)
-    {
-        SendMessageW(m_SliderSize, TBM_SETPOS, TRUE, settings.size);
-        wchar_t sizeText[32];
-        swprintf_s(sizeText, L"%dpx", settings.size);
-        SetWindowTextW(m_BtnSizeReset, sizeText);
-    }
-    
-    // Apply opacity
-    if (m_SliderOpacity)
-    {
-        int opacityPercent = (int)(settings.opacity * 100);
-        SendMessageW(m_SliderOpacity, TBM_SETPOS, TRUE, opacityPercent);
-        wchar_t opacityText[32];
-        swprintf_s(opacityText, L"%d%%", opacityPercent);
-        SetWindowTextW(m_LabelOpacity, opacityText);
-    }
-    
-    // Apply visibility states
-    m_RadarVisible = settings.radarVisible;
-    SetWindowTextW(m_BtnToggle, settings.radarVisible ? L"Hide Radar" : L"Show Radar");
-    
-    m_DegreesVisible = settings.showDegrees;
-    SetWindowTextW(m_BtnDegrees, settings.showDegrees ? L"[Degrees]" : L"Degrees");
-    
-    m_SweepVisible = settings.showSweep;
-    SetWindowTextW(m_BtnSweep, settings.showSweep ? L"[Sweep]" : L"Sweep");
-    
-    m_MultiSourceEnabled = settings.multiSource;
-    SetWindowTextW(m_BtnMultiSource, settings.multiSource ? L"[Multi]" : L"[Single]");
-    
-    m_AudioCaptureEnabled = settings.audioCaptureEnabled;
-    SetWindowTextW(m_BtnAudioCapture, settings.audioCaptureEnabled ? L"Stop Audio Capture" : L"Start Audio Capture");
-    
-    // Apply echo type - reset all buttons then set selected
-    SetWindowTextW(m_BtnEchoPing, L"Ping");
-    SetWindowTextW(m_BtnEchoTrail, L"Trail");
-    SetWindowTextW(m_BtnEchoRipple, L"Ripple");
-    SetWindowTextW(m_BtnEchoLine, L"Line");
-    SetWindowTextW(m_BtnEchoHex, L"Hex");
-    SetWindowTextW(m_BtnEchoArc, L"Arc");
-    SetWindowTextW(m_BtnEchoCone, L"Cone");
-    SetWindowTextW(m_BtnEchoPulse, L"Pulse");
-    
-    switch (settings.echoType)
-    {
-    case 0: SetWindowTextW(m_BtnEchoPing, L"[Ping]"); break;
-    case 1: SetWindowTextW(m_BtnEchoTrail, L"[Trail]"); break;
-    case 2: SetWindowTextW(m_BtnEchoRipple, L"[Ripple]"); break;
-    case 3: SetWindowTextW(m_BtnEchoLine, L"[Line]"); break;
-    case 4: SetWindowTextW(m_BtnEchoHex, L"[Hex]"); break;
-    case 5: SetWindowTextW(m_BtnEchoArc, L"[Arc]"); break;
-    case 6: SetWindowTextW(m_BtnEchoCone, L"[Cone]"); break;
-    case 7: SetWindowTextW(m_BtnEchoPulse, L"[Pulse]"); break;
-    }
 }

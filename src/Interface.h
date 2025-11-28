@@ -9,8 +9,6 @@
 #include <string>
 #include "Radar.h"
 
-struct AppSettings;
-
 class Interface
 {
 public:
@@ -31,8 +29,6 @@ public:
     void SetPositionCallback(PositionCallback callback) { m_PositionCallback = callback; }
     void SetToggleCallback(ToggleCallback callback) { m_ToggleCallback = callback; }
     void SetDegreesCallback(ToggleCallback callback) { m_DegreesCallback = callback; }
-    void SetSweepCallback(ToggleCallback callback) { m_SweepCallback = callback; }
-    void SetMultiSourceCallback(ToggleCallback callback) { m_MultiSourceCallback = callback; }
     void SetSizeCallback(SizeCallback callback) { m_SizeCallback = callback; }
     void SetOpacityCallback(std::function<void(float)> callback) { m_OpacityCallback = callback; }
     void SetSignatureCallback(std::function<void()> callback) { m_SignatureCallback = callback; }
@@ -43,7 +39,6 @@ public:
     bool IsRunning() const { return m_Running; }
     
     void SetCaptureDeviceInfo(const char* name, int channels);
-    void ApplySettings(const AppSettings& settings);
 
 private:
     bool CreateMenuWindow(HINSTANCE hInstance);
@@ -67,15 +62,8 @@ private:
     static constexpr int BTN_ECHO_PING = 1009;
     static constexpr int BTN_ECHO_TRAIL = 1010;
     static constexpr int BTN_ECHO_RIPPLE = 1011;
-    static constexpr int BTN_ECHO_LINE = 1012;
-    static constexpr int BTN_ECHO_HEX = 1013;
-    static constexpr int BTN_ECHO_ARC = 1014;
-    static constexpr int BTN_ECHO_CONE = 1015;
-    static constexpr int BTN_ECHO_PULSE = 1016;
-    static constexpr int BTN_AUDIO_CAPTURE = 1017;
-    static constexpr int BTN_RESTART_AUDIO = 1018;
-    static constexpr int BTN_SWEEP = 1019;
-    static constexpr int BTN_MULTI_SOURCE = 1020;
+    static constexpr int BTN_AUDIO_CAPTURE = 1012;
+    static constexpr int BTN_RESTART_AUDIO = 1013;
 
     HWND m_Hwnd = nullptr;
     HWND m_GroupAudio = nullptr;
@@ -88,18 +76,11 @@ private:
     HWND m_BtnBottomRight = nullptr;
     HWND m_BtnToggle = nullptr;
     HWND m_BtnDegrees = nullptr;
-    HWND m_BtnSweep = nullptr;
-    HWND m_BtnMultiSource = nullptr;
     HWND m_BtnRandomSig = nullptr;
     HWND m_GroupEcho = nullptr;
     HWND m_BtnEchoPing = nullptr;
     HWND m_BtnEchoTrail = nullptr;
     HWND m_BtnEchoRipple = nullptr;
-    HWND m_BtnEchoLine = nullptr;
-    HWND m_BtnEchoHex = nullptr;
-    HWND m_BtnEchoArc = nullptr;
-    HWND m_BtnEchoCone = nullptr;
-    HWND m_BtnEchoPulse = nullptr;
     HWND m_BtnAudioCapture = nullptr;
     HWND m_BtnRestartAudio = nullptr;
     HWND m_GroupOpacity = nullptr;
@@ -112,15 +93,13 @@ private:
     static constexpr int DEFAULT_RADAR_SIZE = 400;
     
     int m_Width = 340;
-    int m_Height = 720;
+    int m_Height = 610;
     int m_RadarSize = 400;
     
     bool m_Visible = false;
     bool m_Running = true;
     bool m_RadarVisible = true;
     bool m_DegreesVisible = true;
-    bool m_SweepVisible = true;
-    bool m_MultiSourceEnabled = true;
     bool m_AudioCaptureEnabled = false;
     
     std::wstring m_DeviceName;
@@ -132,8 +111,6 @@ private:
     PositionCallback m_PositionCallback;
     ToggleCallback m_ToggleCallback;
     ToggleCallback m_DegreesCallback;
-    ToggleCallback m_SweepCallback;
-    ToggleCallback m_MultiSourceCallback;
     SizeCallback m_SizeCallback;
     std::function<void(float)> m_OpacityCallback;
     std::function<void()> m_SignatureCallback;
