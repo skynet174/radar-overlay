@@ -1,0 +1,29 @@
+# Build outputs
+Bin/
+Build/
+*.exe
+*.pdb
+*.obj
+*.log
+*.tlog/
+*.user
+*.recipe
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Settings (local)
+settings.ini
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+
